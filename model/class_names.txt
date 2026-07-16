@@ -1,2 +1,2 @@
-Normal
-Pneumonia
+NORMAL
+PNEUMONIA

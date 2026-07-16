@@ -9,11 +9,13 @@ IMAGE_SIZE = (224, 224)
 
 BASE_DIR = Path(__file__).parent
 MODEL_PATH = BASE_DIR / "model" / "pneumonia_detector.keras"
+BEST_MODEL_PATH = BASE_DIR / "model" / "best_pneumonia_detector.keras"
 CLASS_NAMES_PATH = BASE_DIR / "model" / "class_names.txt"
 
 
 def load_model():
-    return tf.keras.models.load_model(MODEL_PATH)
+    model_path = BEST_MODEL_PATH if BEST_MODEL_PATH.exists() else MODEL_PATH
+    return tf.keras.models.load_model(model_path)
 
 
 def load_class_names():
