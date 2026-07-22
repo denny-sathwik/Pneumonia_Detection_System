@@ -7,7 +7,7 @@ from predict import CLASS_NAMES_PATH, MODEL_PATH, load_class_names, load_model, 
 
 
 st.set_page_config(
-    page_title="PneumoScan — Chest X-ray Analysis",
+    page_title="Pneumonia-detection-system Chest X-ray Analysis",
     page_icon="🫁",
     layout="centered",
 )
@@ -119,7 +119,7 @@ st.markdown(
     """
     <div class="hero">
       <div class="hero-badge">AI-Powered · Chest X-ray Analysis</div>
-      <div class="hero-title">Pneumonia-detector</div>
+      <div class="hero-title">Pneumonia-detection-system</div>
       <div class="hero-sub">
         Upload a chest X-ray and get an instant AI-driven assessment for
         signs of pneumonia — powered by MobileNetV2 transfer learning.
