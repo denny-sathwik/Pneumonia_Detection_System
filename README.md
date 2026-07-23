@@ -4,6 +4,9 @@ This is my own educational rebuild of a pneumonia X-ray classification project.
 
 The goal is to train a deep learning model that can classify chest X-ray images as:
 
+🔗 Live Demo: [pneumonia-detectionsystem.streamlit.app]([https://pneumonia-detectionsystem.streamlit.app/])
+))
+
 - `NORMAL`
 - `PNEUMONIA`
 
