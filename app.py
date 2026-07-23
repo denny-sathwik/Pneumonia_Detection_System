@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import streamlit as st
+from streamlit.errors import StreamlitSecretNotFoundError
 from PIL import Image
 
 from predict import CLASS_NAMES_PATH, MODEL_PATH, load_class_names, load_model, predict_image
@@ -56,6 +57,25 @@ st.markdown(
         text-transform: uppercase;
         color: #64748b;
         margin-bottom: 0.4rem;
+      }
+
+      .login-panel {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 1.1rem 1.25rem;
+        background: #ffffff;
+        margin: 0.5rem 0 1.5rem;
+      }
+      .login-title {
+        font-size: 1rem;
+        font-weight: 750;
+        margin-bottom: 0.3rem;
+      }
+      .login-copy {
+        color: #64748b;
+        font-size: 0.9rem;
+        line-height: 1.5;
+        margin-bottom: 0;
       }
 
       /* ── result card ── */
@@ -114,6 +134,82 @@ def get_class_names():
     return load_class_names()
 
 
+def get_auth_config():
+    try:
+        return st.secrets.get("auth", {})
+    except StreamlitSecretNotFoundError:
+        return {}
+
+
+def auth_is_configured():
+    auth_config = get_auth_config()
+    required_keys = (
+        "redirect_uri",
+        "cookie_secret",
+        "client_id",
+        "client_secret",
+        "server_metadata_url",
+    )
+
+    return (
+        bool(auth_config)
+        and all(auth_config.get(key) for key in required_keys)
+        and auth_config.get("server_metadata_url")
+        == "https://accounts.google.com/.well-known/openid-configuration"
+    )
+
+
+def get_allowed_emails():
+    try:
+        app_config = st.secrets.get("app", {})
+    except StreamlitSecretNotFoundError:
+        return set()
+
+    emails = app_config.get("allowed_emails", [])
+    if isinstance(emails, str):
+        emails = [emails]
+
+    return {str(email).strip().lower() for email in emails if str(email).strip()}
+
+
+def require_auth():
+    if not auth_is_configured():
+        st.error(
+            "Authentication is not configured yet. Copy "
+            "`.streamlit/secrets.example.toml` to `.streamlit/secrets.toml` "
+            "and fill in your Google OAuth client values."
+        )
+        st.stop()
+
+    if not st.user.is_logged_in:
+        st.markdown(
+            """
+            <div class="login-panel">
+              <div class="login-title">Sign in required</div>
+              <p class="login-copy">
+                This app analyzes chest X-ray images, so access is limited to
+                authenticated users before any uploads or predictions are shown.
+              </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.button("Log in with Google", on_click=st.login, use_container_width=True)
+        st.stop()
+
+    allowed_emails = get_allowed_emails()
+    user_email = str(st.user.get("email", "")).lower()
+
+    if allowed_emails and user_email not in allowed_emails:
+        st.error("Your account is authenticated, but it is not authorized to use this app.")
+        st.button("Log out", on_click=st.logout, use_container_width=True)
+        st.stop()
+
+    with st.sidebar:
+        st.caption(f"Signed in as {st.user.get('email') or st.user.get('name') or 'user'}")
+        st.button("Log out", on_click=st.logout, use_container_width=True)
+
+
 # ── Hero ──────────────────────────────────────────────────────────────────────
 st.markdown(
     """
@@ -130,6 +226,8 @@ st.markdown(
 )
 
 # ── Classifier ────────────────────────────────────────────────────────────────
+require_auth()
+
 model_exists = Path(MODEL_PATH).exists()
 classes_exist = Path(CLASS_NAMES_PATH).exists()
 

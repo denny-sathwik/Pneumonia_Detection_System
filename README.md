@@ -57,6 +57,39 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
+## Google Authentication
+
+The Streamlit app requires Google login before users can upload X-ray images or
+run predictions.
+
+1. Create a Google OAuth client ID in Google Cloud Console.
+2. Add this authorized redirect URI for local development:
+
+```text
+http://localhost:8501/oauth2callback
+```
+
+For Streamlit Community Cloud, also add your deployed app URL plus
+`/oauth2callback`.
+
+3. Copy the example secrets file:
+
+```powershell
+Copy-Item .streamlit\secrets.example.toml .streamlit\secrets.toml
+```
+
+4. Fill in `client_id`, `client_secret`, and a strong `cookie_secret`.
+5. Keep `server_metadata_url` set to Google's value:
+
+```text
+https://accounts.google.com/.well-known/openid-configuration
+```
+
+6. Optionally set `[app].allowed_emails` to restrict which Google accounts can
+   use the app.
+
+Never commit `.streamlit/secrets.toml`.
+
 ## Train
 
 ```powershell
