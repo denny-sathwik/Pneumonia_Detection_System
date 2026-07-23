@@ -6,7 +6,6 @@ from streamlit.errors import StreamlitSecretNotFoundError
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from predict import CLASS_NAMES_PATH, MODEL_PATH, load_class_names, load_model, predict_image
-from xray_gate import XRAY_GATE_MODEL_PATH, XRAY_GATE_THRESHOLD, is_chest_xray, load_xray_gate_model
 
 
 st.set_page_config(
@@ -129,11 +128,6 @@ st.markdown(
 @st.cache_resource
 def get_model():
     return load_model()
-
-
-@st.cache_resource
-def get_xray_gate_model():
-    return load_xray_gate_model()
 
 
 @st.cache_data
@@ -272,12 +266,10 @@ require_auth()
 
 model_exists = Path(MODEL_PATH).exists()
 classes_exist = Path(CLASS_NAMES_PATH).exists()
-xray_gate_exists = Path(XRAY_GATE_MODEL_PATH).exists()
 
-if not model_exists or not classes_exist or not xray_gate_exists:
+if not model_exists or not classes_exist:
     st.warning(
-        "Required model files are missing. Run `python train_model.py` for pneumonia "
-        "classification and `python train_xray_gate.py` for chest X-ray validation."
+        "Required model files are missing. Run `python train_model.py` to train the pneumonia classifier."
     )
 else:
     st.markdown('<div class="upload-label">Upload chest X-ray image only</div>', unsafe_allow_html=True)
@@ -305,20 +297,6 @@ else:
                 "Color score: "
                 f"{color_gate_metrics['mean_saturation']:.1%} mean saturation, "
                 f"{color_gate_metrics['colored_pixel_ratio']:.1%} colored pixels."
-            )
-            st.stop()
-
-        xray_gate_model = get_xray_gate_model()
-        is_valid_xray, xray_probability = is_chest_xray(image, model=xray_gate_model)
-        if not is_valid_xray:
-            st.image(image, use_container_width=True)
-            st.error("Image does not appear to be a chest X-ray.")
-            st.warning(
-                "Please upload only clear chest X-ray images."
-            )
-            st.caption(
-                f"Chest X-ray gate score: {xray_probability:.1%} "
-                f"(required: {XRAY_GATE_THRESHOLD:.0%})"
             )
             st.stop()
 
