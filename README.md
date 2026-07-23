@@ -7,6 +7,8 @@ The goal is to train a deep learning model that can classify chest X-ray images 
 🔗 Live Demo: [pneumonia-detectionsystem.streamlit.app](https://pneumonia-detectionsystem.streamlit.app/)
 
 
+![Home Page](model/img/project2.jpg)
+
 - `NORMAL`
 - `PNEUMONIA`
 
