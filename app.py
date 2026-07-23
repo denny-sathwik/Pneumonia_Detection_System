@@ -1,10 +1,12 @@
 from pathlib import Path
 
+import numpy as np
 import streamlit as st
 from streamlit.errors import StreamlitSecretNotFoundError
-from PIL import Image
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 from predict import CLASS_NAMES_PATH, MODEL_PATH, load_class_names, load_model, predict_image
+from xray_gate import XRAY_GATE_MODEL_PATH, XRAY_GATE_THRESHOLD, is_chest_xray, load_xray_gate_model
 
 
 st.set_page_config(
@@ -129,6 +131,11 @@ def get_model():
     return load_model()
 
 
+@st.cache_resource
+def get_xray_gate_model():
+    return load_xray_gate_model()
+
+
 @st.cache_data
 def get_class_names():
     return load_class_names()
@@ -210,6 +217,41 @@ def require_auth():
         st.button("Log out", on_click=st.logout, use_container_width=True)
 
 
+def load_uploaded_image(uploaded_file):
+    try:
+        image = Image.open(uploaded_file)
+        image.verify()
+        uploaded_file.seek(0)
+        image = Image.open(uploaded_file)
+        return ImageOps.exif_transpose(image)
+    except (OSError, UnidentifiedImageError):
+        return None
+
+
+def passes_color_gate(image):
+    rgb_image = image.convert("RGB").resize((224, 224))
+    image_array = np.asarray(rgb_image, dtype=np.float32)
+
+    max_channel = np.max(image_array, axis=2)
+    min_channel = np.min(image_array, axis=2)
+    channel_spread = max_channel - min_channel
+    saturation = np.divide(
+        channel_spread,
+        np.maximum(max_channel, 1),
+        out=np.zeros_like(channel_spread),
+        where=max_channel > 0,
+    )
+
+    mean_saturation = float(np.mean(saturation))
+    colored_pixel_ratio = float(np.mean((saturation > 0.35) & (max_channel > 45)))
+
+    passed = mean_saturation <= 0.22 or colored_pixel_ratio <= 0.18
+    return passed, {
+        "mean_saturation": mean_saturation,
+        "colored_pixel_ratio": colored_pixel_ratio,
+    }
+
+
 # ── Hero ──────────────────────────────────────────────────────────────────────
 st.markdown(
     """
@@ -230,27 +272,58 @@ require_auth()
 
 model_exists = Path(MODEL_PATH).exists()
 classes_exist = Path(CLASS_NAMES_PATH).exists()
+xray_gate_exists = Path(XRAY_GATE_MODEL_PATH).exists()
 
-if not model_exists or not classes_exist:
+if not model_exists or not classes_exist or not xray_gate_exists:
     st.warning(
-        "No trained model found. Run `python train_model.py` first to generate "
-        "`model/pneumonia_detector.keras` and `model/class_names.txt`."
+        "Required model files are missing. Run `python train_model.py` for pneumonia "
+        "classification and `python train_xray_gate.py` for chest X-ray validation."
     )
 else:
-    model = get_model()
-    class_names = get_class_names()
-
-    st.markdown('<div class="upload-label">Upload X-ray image</div>', unsafe_allow_html=True)
+    st.markdown('<div class="upload-label">Upload chest X-ray image only</div>', unsafe_allow_html=True)
     uploaded_file = st.file_uploader(
         label="upload",
         type=["jpg", "jpeg", "png"],
+        help="Upload only a clear chest X-ray.",
         label_visibility="collapsed",
     )
 
     if uploaded_file is None:
-        st.info("Drag and drop a chest X-ray image (JPG or PNG) to begin analysis.")
+        st.info("Drag and drop a clear chest X-ray image (JPG or PNG) to begin analysis.")
     else:
-        image = Image.open(uploaded_file)
+        image = load_uploaded_image(uploaded_file)
+        if image is None:
+            st.error("The uploaded file could not be opened as an image. Please upload a chest X-ray JPG or PNG.")
+            st.stop()
+
+        passed_color_gate, color_gate_metrics = passes_color_gate(image)
+        if not passed_color_gate:
+            st.image(image, use_container_width=True)
+            st.error("Image appears to be a color image.")
+            st.warning("Please upload a clear grayscale chest X-ray.")
+            st.caption(
+                "Color score: "
+                f"{color_gate_metrics['mean_saturation']:.1%} mean saturation, "
+                f"{color_gate_metrics['colored_pixel_ratio']:.1%} colored pixels."
+            )
+            st.stop()
+
+        xray_gate_model = get_xray_gate_model()
+        is_valid_xray, xray_probability = is_chest_xray(image, model=xray_gate_model)
+        if not is_valid_xray:
+            st.image(image, use_container_width=True)
+            st.error("Image does not appear to be a chest X-ray.")
+            st.warning(
+                "Please upload only clear chest X-ray images."
+            )
+            st.caption(
+                f"Chest X-ray gate score: {xray_probability:.1%} "
+                f"(required: {XRAY_GATE_THRESHOLD:.0%})"
+            )
+            st.stop()
+
+        model = get_model()
+        class_names = get_class_names()
         result = predict_image(image, model=model, class_names=class_names)
 
         img_col, res_col = st.columns([1, 1], gap="large")

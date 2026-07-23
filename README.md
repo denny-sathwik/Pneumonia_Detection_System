@@ -22,6 +22,8 @@ This project is for learning only. It is not a medical diagnosis tool.
 my-pneumonia-detector/
   app.py
   train_model.py
+  train_xray_gate.py
+  xray_gate.py
   predict.py
   requirements.txt
   README.md
@@ -30,6 +32,7 @@ my-pneumonia-detector/
       train/
       val/
       test/
+    not_chest_xray/
   model/
   sample_images/
 ```
@@ -48,6 +51,43 @@ data/chest_xray/val/PNEUMONIA/
 data/chest_xray/test/NORMAL/
 data/chest_xray/test/PNEUMONIA/
 ```
+
+## Chest X-ray Upload Barrier
+
+The app uses two upload gates before the pneumonia classifier runs:
+
+1. A fast color gate rejects obvious color images.
+2. A trained X-ray gate model rejects images below the chest-X-ray threshold.
+
+The default X-ray gate threshold is `60%` while the gate is trained on a small
+dataset. Raise it after training with a larger, more reliable dataset.
+
+Put non-chest-X-ray images here:
+
+```text
+data/not_chest_xray/
+```
+
+Use many different negative examples: normal photos, black-and-white photos,
+documents, charts, CT scans, MRI scans, other body-part X-rays, and random
+grayscale images. The gate learns from these examples, so a weak negative set
+will create a weak barrier.
+
+Train the gate:
+
+```powershell
+python train_xray_gate.py
+```
+
+This creates:
+
+```text
+model/xray_gate.keras
+model/xray_gate_accuracy.png
+```
+
+The Streamlit app fails closed: if `model/xray_gate.keras` is missing, it will
+not run pneumonia prediction.
 
 ## Setup
 
@@ -116,7 +156,9 @@ Basic steps:
 ```text
 app.py
 predict.py
+xray_gate.py
 requirements.txt
+model/xray_gate.keras
 model/pneumonia_detector.keras
 model/class_names.txt
 ```
